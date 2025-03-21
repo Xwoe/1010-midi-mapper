@@ -1,7 +1,13 @@
 from lxml import etree
+from copy import copy
 
 INFILE = "/Users/schwoe/DEV/1010-midi-mapper/test_files/NuDefault.nnl"
 OUTFILES = ["/Users/schwoe/DEV/1010-midi-mapper/test_files/TEST MAPPING.nnl"]
+
+from mod_source_list import NUM_SLOTS, ModSourceList
+
+
+DEFAULT_SLOT = "1"
 
 
 class MidiMapper:
@@ -37,16 +43,44 @@ class MidiMapper:
             )
             print(cell_outfile)
             # get all modsources from the outfile, which have the same destination
-            mod_same_dest = cell_outfile[0].xpath(
+            modsources = cell_outfile[0].xpath(
                 f'./modsource[@dest="{mod_infile.attrib["dest"]}"]'
             )
-            if len(mod_same_dest) == 0:
-                # place it in the first slot
-                ...
-            # if there are there are modsources, we will first look for the ones with midicc.
-            # if there is one we will replace it
-            # if there is a gap... slot 0, 1 or 2 not filled, we will place it there
-            # if there is no gap, we will replace the middle one with index 1 (because in blackbox 0 and 2 are sometimes set by default)
+            mod_same_dest = ModSourceList(modsources=modsources)
+
+            # if there is a free slot, we will place it there
+            first_free_slot = mod_same_dest.first_free_slot()
+            if first_free_slot:
+                # place it in the first free slot
+                # TODO don't know if the order matters. Then we would have to find out, what the order of the
+                # modsources is in the infile, even if they are missing
+                # let's just put it at the end and see if it works. Otherwise we'll have to sort it and
+                # add it back in
+                new_elem = copy(mod_infile)
+                new_elem.attrib["slot"] = first_free_slot
+                # TODO probably wrong place to insert it, hast to be appended to the children
+                cell_outfile.append(new_elem)
+                continue
+
+            # if there is a midicc modsource, we will replace it
+            first_cc_modsource = mod_same_dest.first_cc_modsource()
+            if first_cc_modsource:
+                # replace it
+                first_cc_modsource.attrib["mchan"] = mod_infile.attrib["mchan"]
+                first_cc_modsource.attrib["cc_num"] = mod_infile.attrib["cc_num"]
+                first_cc_modsource.attrib["amount"] = mod_infile.attrib["amount"]
+                continue
+
+            # if there is no gap, we will replace the middle one with index 1
+            # (because in blackbox 0 and 2 are sometimes set by default)
+            middle_elem = mod_same_dest.elem_at_slot(DEFAULT_SLOT)
+            if middle_elem:
+                # replace it
+                middle_elem.attrib["src"] = mod_infile.attrib["src"]
+                middle_elem.attrib["mchan"] = mod_infile.attrib["mchan"]
+                middle_elem.attrib["cc_num"] = mod_infile.attrib["cc_num"]
+                middle_elem.attrib["amount"] = mod_infile.attrib["amount"]
+                continue
 
             # insert element
             # https://stackoverflow.com/questions/68446063/python-lxml-inserting-node-from-one-file-into-another-file-with-proper-structu
