@@ -3,11 +3,18 @@ import os
 from lxml import etree
 from copy import copy
 
-INFILE = "/Users/schwoe/DEV/1010-midi-mapper/test_files/NuDefault.nnl"
+# INFILE = "/Users/schwoe/DEV/1010-midi-mapper/test_files/lemondrop/NuDefault.nnl"
+# OUTFILES = [
+#     "/Users/schwoe/DEV/1010-midi-mapper/test_files/lemondrop/TEST MAPPING.nnl",
+#     "/Users/schwoe/DEV/1010-midi-mapper/test_files/lemondrop/NAPILI4.nnl",
+#     "/Users/schwoe/DEV/1010-midi-mapper/test_files/lemondrop/RHYTHMIC DRONEBIRD.nnl",
+# ]
+
+INFILE = "/Users/schwoe/DEV/1010-midi-mapper/test_files/blackbox/XWOEAGAIN 10 A203/preset.xml"
 OUTFILES = [
-    "/Users/schwoe/DEV/1010-midi-mapper/test_files/TEST MAPPING.nnl",
-    "/Users/schwoe/DEV/1010-midi-mapper/test_files/NAPILI4.nnl",
-    "/Users/schwoe/DEV/1010-midi-mapper/test_files/RHYTHMIC DRONEBIRD.nnl",
+    "/Users/schwoe/DEV/1010-midi-mapper/test_files/blackbox/SL AMBIENT DRONES/preset.xml",
+    "/Users/schwoe/DEV/1010-midi-mapper/test_files/blackbox/SL BASS MUSIC KIT/preset.xml",
+    "/Users/schwoe/DEV/1010-midi-mapper/test_files/blackbox/SL DARK AMBIENT/preset.xml",
 ]
 
 from mod_source_list import NUM_SLOTS, ModSourceList
