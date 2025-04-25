@@ -27,7 +27,11 @@ OUTFILE_APPENDIX = "_mm"
 
 class MidiMapper:
     def __init__(
-        self, infile: str, outfiles: list, wipe_existing_mappings: bool = False
+        self,
+        infile: str,
+        outfiles: list,
+        wipe_existing_mappings: bool = False,
+        cell_params: bool = True,
     ):
         self.infile = infile
         self.outfiles = outfiles
@@ -35,6 +39,7 @@ class MidiMapper:
         self.parser = etree.XMLParser(recover=True)
         self.root_infile = self.read_xml_file(infile)
         self.modsources_infile = self.filter_midi_modsources(self.root_infile)
+        self.pad_params_infile = self.filter_pad_params(self.root_infile)
 
     def read_xml_file(self, filepath):
         with open(filepath, "rb") as f:
@@ -62,11 +67,16 @@ class MidiMapper:
         modsources = root.xpath('.//modsource[@src="midicc"]')
         return modsources
 
+    def filter_pad_params(self, root):
+        padparams = root.xpath('.//cell[@type="sample"]/params')
+        return padparams
+
     def run(self):
         for outfile in self.outfiles:
             root_outfile = self.read_xml_file(outfile)
             self.wipe_modsources(root_outfile)
             self.insert_modsources(root_outfile)
+            self.insert_pad_params(root_outfile)
             self.write_xml_file(filepath=outfile, root=root_outfile)
 
     def wipe_modsources(self, root_outfile):
@@ -132,6 +142,13 @@ class MidiMapper:
             new_elem.attrib["slot"] = DEFAULT_SLOT
             cell_outfile.append(new_elem)
 
+    def insert_pad_params(self, root_outfile):
+        for pad_params in self.pad_params_infile:
+            ...
+            # get the corresponding cell param from the outfile
+            # write the names in the fields
+        ...
+
     def add_to_free_slot(self, mod_infile, cell_outfile, slot):
         new_elem = copy(mod_infile)
         new_elem.attrib["slot"] = slot
@@ -145,8 +162,8 @@ class MidiMapper:
 
 if __name__ == "__main__":
 
-    # mm = MidiMapper(infile=INFILE, outfiles=OUTFILES)
-    mm = MidiMapper(infile=INFILE, outfiles=OUTFILES, wipe_existing_mappings=True)
+    mm = MidiMapper(infile=INFILE, outfiles=OUTFILES)
+    # mm = MidiMapper(infile=INFILE, outfiles=OUTFILES, wipe_existing_mappings=True)
     mm.run()
     # parent, where to insert them
     # el.getparent().attrib
