@@ -31,15 +31,19 @@ class MidiMapper:
         infile: str,
         outfiles: list,
         wipe_existing_mappings: bool = False,
-        cell_params: bool = True,
+        is_copy_cell_params: bool = True,
+        is_copy_noteseq_params: bool = True,
     ):
         self.infile = infile
         self.outfiles = outfiles
         self.wipe_existing_mappings = wipe_existing_mappings
         self.parser = etree.XMLParser(recover=True)
         self.root_infile = self.read_xml_file(infile)
+        self.is_copy_pad_params = is_copy_cell_params
+        self.is_copy_noteseq_params = is_copy_noteseq_params
         self.modsources_infile = self.filter_midi_modsources(self.root_infile)
         self.pad_params_infile = self.filter_pad_params(self.root_infile)
+        self.noteseq_params = self.filter_noteseq_params(self.root_infile)
 
     def read_xml_file(self, filepath):
         with open(filepath, "rb") as f:
@@ -63,6 +67,14 @@ class MidiMapper:
             )
             f.write(xml)
 
+    def run(self):
+        for outfile in self.outfiles:
+            root_outfile = self.read_xml_file(outfile)
+            self.wipe_modsources(root_outfile)
+            self.insert_modsources(root_outfile)
+            self.insert_pad_params(root_outfile)
+            self.write_xml_file(filepath=outfile, root=root_outfile)
+
     def filter_midi_modsources(self, root):
         modsources = root.xpath('.//modsource[@src="midicc"]')
         return modsources
@@ -71,13 +83,9 @@ class MidiMapper:
         padparams = root.xpath('.//cell[@type="sample"]/params')
         return padparams
 
-    def run(self):
-        for outfile in self.outfiles:
-            root_outfile = self.read_xml_file(outfile)
-            self.wipe_modsources(root_outfile)
-            self.insert_modsources(root_outfile)
-            self.insert_pad_params(root_outfile)
-            self.write_xml_file(filepath=outfile, root=root_outfile)
+    def filter_noteseq_params(self, root):
+        noteseqparams = root.xpath('.//cell[@seqsublayer="0"][@type="noteseq"]')
+        return noteseqparams
 
     def wipe_modsources(self, root_outfile):
         if not self.wipe_existing_mappings:
@@ -143,11 +151,52 @@ class MidiMapper:
             cell_outfile.append(new_elem)
 
     def insert_pad_params(self, root_outfile):
+        if not self.is_copy_pad_params:
+            return
         for pad_params in self.pad_params_infile:
-            ...
-            # get the corresponding cell param from the outfile
-            # write the names in the fields
-        ...
+            # get element from outfile
+            params_outfile = root_outfile.xpath(
+                f'.//cell[@row="{pad_params["row"]}"][@column="{pad_params["column"]}"][@layer="{pad_params["layer"]}"]/params'
+            )
+            try:
+                params_outfile = params_outfile[0]
+                if "midimode" in pad_params.attrib:
+                    params_outfile.attrib["midimode"] = pad_params.attrib["midimode"]
+
+            except IndexError:
+                print(
+                    f"Cell not found in outfile for row {pad_params.attrib['row']} and column {pad_params.attrib['column']}"
+                )
+                continue
+
+            except Exception as e:
+                print(f"Error: {e}")
+                continue
+
+    def insert_noteseq_params(self, root_outfile):
+        if not self.is_copy_noteseq_params:
+            return
+        for noteseq_params in self.noteseq_params:
+            # get element from outfile
+            params_outfile = root_outfile.xpath(
+                f'.//cell[@row="{noteseq_params.attrib["row"]}"][@column="{noteseq_params.attrib["column"]}"][@layer="{noteseq_params.attrib["layer"]}"][@seqsublayer="{noteseq_params.attrib["seqsublayer"]}"]/params'
+            )
+            try:
+                params_outfile = params_outfile[0]
+
+                # - seqpadmapdest
+                # - midioutchan
+                # - midiseqcellchan
+
+            except IndexError:
+                print(
+                    f"Cell not found in outfile for row {noteseq_params.attrib['row']} and column {noteseq_params.attrib['column']}"
+                )
+                continue
+
+            except Exception as e:
+                print(f"Error: {e}")
+                continue
 
     def add_to_free_slot(self, mod_infile, cell_outfile, slot):
         new_elem = copy(mod_infile)
@@ -173,3 +222,11 @@ if __name__ == "__main__":
 
 
 # https://yasoob.me/2018/06/20/an-intro-to-web-scraping-with-lxml-and-python/
+
+
+# type noteseq
+# seems like we only have to replace the values in seqsublayer="0", because the other seqsublayers never have thos
+# value set
+# - seqpadmapdest
+# - midioutchan
+# - midiseqcellchan
