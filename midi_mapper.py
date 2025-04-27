@@ -73,6 +73,7 @@ class MidiMapper:
             self.wipe_modsources(root_outfile)
             self.insert_modsources(root_outfile)
             self.insert_pad_params(root_outfile)
+            self.insert_noteseq_params(root_outfile)
             self.write_xml_file(filepath=outfile, root=root_outfile)
 
     def filter_midi_modsources(self, root):
@@ -84,7 +85,7 @@ class MidiMapper:
         return padparams
 
     def filter_noteseq_params(self, root):
-        noteseqparams = root.xpath('.//cell[@seqsublayer="0"][@type="noteseq"]')
+        noteseqparams = root.xpath('.//cell[@seqsublayer="0"][@type="noteseq"]/params')
         return noteseqparams
 
     def wipe_modsources(self, root_outfile):
@@ -154,11 +155,12 @@ class MidiMapper:
         if not self.is_copy_pad_params:
             return
         for pad_params in self.pad_params_infile:
-            # get element from outfile
-            params_outfile = root_outfile.xpath(
-                f'.//cell[@row="{pad_params["row"]}"][@column="{pad_params["column"]}"][@layer="{pad_params["layer"]}"]/params'
-            )
             try:
+                pad_params_cell = pad_params.getparent()
+                # get element from outfile
+                params_outfile = root_outfile.xpath(
+                    f'.//cell[@row="{pad_params_cell.attrib["row"]}"][@column="{pad_params_cell.attrib["column"]}"][@layer="{pad_params_cell.attrib["layer"]}"]/params'
+                )
                 params_outfile = params_outfile[0]
                 if "midimode" in pad_params.attrib:
                     params_outfile.attrib["midimode"] = pad_params.attrib["midimode"]
@@ -177,20 +179,43 @@ class MidiMapper:
         if not self.is_copy_noteseq_params:
             return
         for noteseq_params in self.noteseq_params:
-            # get element from outfile
-            params_outfile = root_outfile.xpath(
-                f'.//cell[@row="{noteseq_params.attrib["row"]}"][@column="{noteseq_params.attrib["column"]}"][@layer="{noteseq_params.attrib["layer"]}"][@seqsublayer="{noteseq_params.attrib["seqsublayer"]}"]/params'
-            )
             try:
-                params_outfile = params_outfile[0]
+                noteseq_params_cell = noteseq_params.getparent()
 
-                # - seqpadmapdest
-                # - midioutchan
-                # - midiseqcellchan
+                # get element from outfile
+
+                params_outfile = root_outfile.xpath(
+                    f'.//cell[@row="{noteseq_params_cell.attrib["row"]}"]'
+                    + f'[@column="{noteseq_params_cell.attrib["column"]}"]'
+                    + f'[@layer="{noteseq_params_cell.attrib["layer"]}"]'
+                    + f'[@seqsublayer="{noteseq_params_cell.attrib["seqsublayer"]}"]/params'
+                )
+                # it might be that the sequence hasn't been initialized yet and in that case
+                # the seqsublayer is empty
+                if not params_outfile:
+                    params_outfile = root_outfile.xpath(
+                        f'.//cell[@row="{noteseq_params_cell.attrib["row"]}"]'
+                        + f'[@column="{noteseq_params_cell.attrib["column"]}"]'
+                        + f'[@layer="{noteseq_params_cell.attrib["layer"]}"]/params'
+                    )
+
+                params_outfile = params_outfile[0]
+                if "seqpadmapdest" in noteseq_params.attrib:
+                    params_outfile.attrib["seqpadmapdest"] = noteseq_params.attrib[
+                        "seqpadmapdest"
+                    ]
+                if "midioutchan" in noteseq_params.attrib:
+                    params_outfile.attrib["midioutchan"] = noteseq_params.attrib[
+                        "midioutchan"
+                    ]
+                if "midiseqcellchan" in noteseq_params.attrib:
+                    params_outfile.attrib["midiseqcellchan"] = noteseq_params.attrib[
+                        "midiseqcellchan"
+                    ]
 
             except IndexError:
                 print(
-                    f"Cell not found in outfile for row {noteseq_params.attrib['row']} and column {noteseq_params.attrib['column']}"
+                    f"Cell not found in outfile for row {noteseq_params_cell.attrib['row']} and column {noteseq_params_cell.attrib['column']}"
                 )
                 continue
 
