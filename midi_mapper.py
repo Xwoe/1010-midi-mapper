@@ -165,6 +165,9 @@ class MidiMapper:
                 if "midimode" in pad_params.attrib:
                     params_outfile.attrib["midimode"] = pad_params.attrib["midimode"]
 
+                if "outputbus" in pad_params.attrib:
+                    params_outfile.attrib["outputbus"] = pad_params.attrib["outputbus"]
+
             except IndexError:
                 print(
                     f"Cell not found in outfile for row {pad_params.attrib['row']} and column {pad_params.attrib['column']}"
@@ -255,3 +258,5 @@ if __name__ == "__main__":
 # - seqpadmapdest
 # - midioutchan
 # - midiseqcellchan
+# TODO
+# - outputbus
