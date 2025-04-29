@@ -22,6 +22,7 @@ DEFAULT_SLOT = "1"
 # OUTFILE_APPENDIX = "_mm"
 
 PADPARAM_DEVICES = [models.TenTenDevice.BLACKBOX]
+NOTESEQ_PARAM_DEVICES = [models.TenTenDevice.BLACKBOX]
 
 
 class MidiMapper:
@@ -48,7 +49,10 @@ class MidiMapper:
     def read_settings(self, settings):
         # make sure the settings have been passed correctly
         if self.tenten_device == models.TenTenDevice.BLACKBOX:
-            assert isinstance(self.settings, models.BlackboxSettings)
+            if not isinstance(settings, models.BlackboxSettings):
+                raise TypeError(
+                    "Settings must be of type BlackboxSettings for BLACKBOX device."
+                )
             return settings
 
         elif self.tenten_device == models.TenTenDevice.LEMONDROP:
@@ -70,13 +74,19 @@ class MidiMapper:
             return root
 
     def write_xml_file(self, filepath, root):
-        # get the extension of the file
-        filename, file_extension = os.path.splitext(filepath)
-        # appendix = (
-        #     OUTFILE_APPENDIX_WIPED if self.wipe_existing_mappings else OUTFILE_APPENDIX
-        # )
-        appendix = ""
-        new_fp = f"{filename}{appendix}{file_extension}"
+        # get the filename and prepare the output path
+        file_name = os.path.basename(filepath)
+        base_name, file_extension = os.path.splitext(file_name)
+        new_fp = os.path.join(self.outfile_subfolder, file_name)
+
+        # handle filename conflicts by appending an incrementing index
+        index = 1
+        while os.path.exists(new_fp):
+            new_fp = os.path.join(
+                self.outfile_subfolder, f"{base_name}{index}{file_extension}"
+            )
+            index += 1
+
         with open(new_fp, "wb") as f:
             xml = etree.tostring(
                 root,
@@ -174,10 +184,12 @@ class MidiMapper:
                 pad_params_cell = pad_params.getparent()
                 # get element from outfile
                 params_outfile = root_outfile.xpath(
-                    f'.//cell[@row="{pad_params_cell.attrib["row"]}"][@column="{pad_params_cell.attrib["column"]}"][@layer="{pad_params_cell.attrib["layer"]}"]/params'
+                    f'.//cell[@row="{pad_params_cell.attrib["row"]}"]'
+                    + f'[@column="{pad_params_cell.attrib["column"]}"]'
+                    + f'[@layer="{pad_params_cell.attrib["layer"]}"]/params'
                 )
                 params_outfile = params_outfile[0]
-                for key in self.blackbox_settings.pad_params:
+                for key in self.settings.pad_params:
                     if key in pad_params.attrib:
                         params_outfile.attrib[key] = pad_params.attrib[key]
                 # if "midimode" in pad_params.attrib:
@@ -197,7 +209,7 @@ class MidiMapper:
                 continue
 
     def insert_noteseq_params(self, root_outfile):
-        if not self.is_copy_noteseq_params:
+        if not self.tenten_device in NOTESEQ_PARAM_DEVICES:
             return
         for noteseq_params in self.noteseq_params_infile:
             try:
@@ -221,7 +233,7 @@ class MidiMapper:
                     )
 
                 params_outfile = params_outfile[0]
-                for key in self.blackbox_settings.noteseq_params:
+                for key in self.settings.noteseq_params:
                     if key in noteseq_params.attrib:
                         params_outfile.attrib[key] = noteseq_params.attrib[key]
                 # if "seqpadmapdest" in noteseq_params.attrib:
@@ -239,7 +251,8 @@ class MidiMapper:
 
             except IndexError:
                 print(
-                    f"Cell not found in outfile for row {noteseq_params_cell.attrib['row']} and column {noteseq_params_cell.attrib['column']}"
+                    f"Cell not found in outfile for row {noteseq_params_cell.attrib['row']} "
+                    + f"and column {noteseq_params_cell.attrib['column']}"
                 )
                 continue
 
