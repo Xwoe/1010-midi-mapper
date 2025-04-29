@@ -1,4 +1,5 @@
 import os
+import uuid
 
 from lxml import etree
 from copy import copy
@@ -10,19 +11,17 @@ from copy import copy
 #     "/Users/schwoe/DEV/1010-midi-mapper/test_files/lemondrop/RHYTHMIC DRONEBIRD.nnl",
 # ]
 
-INFILE = "/Users/schwoe/DEV/1010-midi-mapper/test_files/blackbox/XWOEAGAIN 10 A203/preset.xml"
-OUTFILES = [
-    "/Users/schwoe/DEV/1010-midi-mapper/test_files/blackbox/SL AMBIENT DRONES/preset.xml",
-    "/Users/schwoe/DEV/1010-midi-mapper/test_files/blackbox/SL BASS MUSIC KIT/preset.xml",
-    "/Users/schwoe/DEV/1010-midi-mapper/test_files/blackbox/SL DARK AMBIENT/preset.xml",
-]
 
 from mod_source_list import NUM_SLOTS, ModSourceList
+import models
 
+ROOT_FOLDER = os.path.dirname(os.path.abspath(__file__))
 
 DEFAULT_SLOT = "1"
-OUTFILE_APPENDIX_WIPED = "_mm_wiped"
-OUTFILE_APPENDIX = "_mm"
+# OUTFILE_APPENDIX_WIPED = "_mm_wiped"
+# OUTFILE_APPENDIX = "_mm"
+
+PADPARAM_DEVICES = [models.TenTenDevice.BLACKBOX]
 
 
 class MidiMapper:
@@ -31,19 +30,38 @@ class MidiMapper:
         infile: str,
         outfiles: list,
         wipe_existing_mappings: bool = False,
-        is_copy_cell_params: bool = True,
-        is_copy_noteseq_params: bool = True,
+        tenten_device=models.TenTenDevice.BLACKBOX,
+        settings=None,
     ):
         self.infile = infile
         self.outfiles = outfiles
         self.wipe_existing_mappings = wipe_existing_mappings
         self.parser = etree.XMLParser(recover=True)
         self.root_infile = self.read_xml_file(infile)
-        self.is_copy_pad_params = is_copy_cell_params
-        self.is_copy_noteseq_params = is_copy_noteseq_params
         self.modsources_infile = self.filter_midi_modsources(self.root_infile)
         self.pad_params_infile = self.filter_pad_params(self.root_infile)
-        self.noteseq_params = self.filter_noteseq_params(self.root_infile)
+        self.noteseq_params_infile = self.filter_noteseq_params(self.root_infile)
+        self.tenten_device = tenten_device
+        self.settings = self.read_settings(settings)
+        self.outfile_subfolder = self.get_output_folder()
+
+    def read_settings(self, settings):
+        # make sure the settings have been passed correctly
+        if self.tenten_device == models.TenTenDevice.BLACKBOX:
+            assert isinstance(self.settings, models.BlackboxSettings)
+            return settings
+
+        elif self.tenten_device == models.TenTenDevice.LEMONDROP:
+            return None
+        else:
+            return None
+
+    def get_output_folder(self):
+        # generate a randomly named folder as the output
+        folder = os.path.join(ROOT_FOLDER, str(uuid.uuid4())[:8])
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        return folder
 
     def read_xml_file(self, filepath):
         with open(filepath, "rb") as f:
@@ -54,9 +72,10 @@ class MidiMapper:
     def write_xml_file(self, filepath, root):
         # get the extension of the file
         filename, file_extension = os.path.splitext(filepath)
-        appendix = (
-            OUTFILE_APPENDIX_WIPED if self.wipe_existing_mappings else OUTFILE_APPENDIX
-        )
+        # appendix = (
+        #     OUTFILE_APPENDIX_WIPED if self.wipe_existing_mappings else OUTFILE_APPENDIX
+        # )
+        appendix = ""
         new_fp = f"{filename}{appendix}{file_extension}"
         with open(new_fp, "wb") as f:
             xml = etree.tostring(
@@ -125,10 +144,6 @@ class MidiMapper:
             first_free_slot = mod_same_dest.first_free_slot()
             if first_free_slot is not None:
                 # place it in the first free slot
-                # TODO don't know if the order matters. Then we would have to find out, what the order of the
-                # modsources is in the infile, even if they are missing
-                # let's just put it at the end and see if it works. Otherwise we'll have to sort it and
-                # add it back in
                 self.add_to_free_slot(mod_infile, cell_outfile, first_free_slot)
                 continue
 
@@ -152,7 +167,7 @@ class MidiMapper:
             cell_outfile.append(new_elem)
 
     def insert_pad_params(self, root_outfile):
-        if not self.is_copy_pad_params:
+        if not self.tenten_device in PADPARAM_DEVICES:
             return
         for pad_params in self.pad_params_infile:
             try:
@@ -162,11 +177,14 @@ class MidiMapper:
                     f'.//cell[@row="{pad_params_cell.attrib["row"]}"][@column="{pad_params_cell.attrib["column"]}"][@layer="{pad_params_cell.attrib["layer"]}"]/params'
                 )
                 params_outfile = params_outfile[0]
-                if "midimode" in pad_params.attrib:
-                    params_outfile.attrib["midimode"] = pad_params.attrib["midimode"]
+                for key in self.blackbox_settings.pad_params:
+                    if key in pad_params.attrib:
+                        params_outfile.attrib[key] = pad_params.attrib[key]
+                # if "midimode" in pad_params.attrib:
+                #     params_outfile.attrib["midimode"] = pad_params.attrib["midimode"]
 
-                if "outputbus" in pad_params.attrib:
-                    params_outfile.attrib["outputbus"] = pad_params.attrib["outputbus"]
+                # if "outputbus" in pad_params.attrib:
+                #     params_outfile.attrib["outputbus"] = pad_params.attrib["outputbus"]
 
             except IndexError:
                 print(
@@ -181,7 +199,7 @@ class MidiMapper:
     def insert_noteseq_params(self, root_outfile):
         if not self.is_copy_noteseq_params:
             return
-        for noteseq_params in self.noteseq_params:
+        for noteseq_params in self.noteseq_params_infile:
             try:
                 noteseq_params_cell = noteseq_params.getparent()
 
@@ -203,18 +221,21 @@ class MidiMapper:
                     )
 
                 params_outfile = params_outfile[0]
-                if "seqpadmapdest" in noteseq_params.attrib:
-                    params_outfile.attrib["seqpadmapdest"] = noteseq_params.attrib[
-                        "seqpadmapdest"
-                    ]
-                if "midioutchan" in noteseq_params.attrib:
-                    params_outfile.attrib["midioutchan"] = noteseq_params.attrib[
-                        "midioutchan"
-                    ]
-                if "midiseqcellchan" in noteseq_params.attrib:
-                    params_outfile.attrib["midiseqcellchan"] = noteseq_params.attrib[
-                        "midiseqcellchan"
-                    ]
+                for key in self.blackbox_settings.noteseq_params:
+                    if key in noteseq_params.attrib:
+                        params_outfile.attrib[key] = noteseq_params.attrib[key]
+                # if "seqpadmapdest" in noteseq_params.attrib:
+                #     params_outfile.attrib["seqpadmapdest"] = noteseq_params.attrib[
+                #         "seqpadmapdest"
+                #     ]
+                # if "midioutchan" in noteseq_params.attrib:
+                #     params_outfile.attrib["midioutchan"] = noteseq_params.attrib[
+                #         "midioutchan"
+                #     ]
+                # if "midiseqcellchan" in noteseq_params.attrib:
+                #     params_outfile.attrib["midiseqcellchan"] = noteseq_params.attrib[
+                #         "midiseqcellchan"
+                #     ]
 
             except IndexError:
                 print(
@@ -237,16 +258,16 @@ class MidiMapper:
         # https://stackoverflow.com/questions/41742435/replacing-a-xml-element-with-lxml
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    mm = MidiMapper(infile=INFILE, outfiles=OUTFILES)
-    # mm = MidiMapper(infile=INFILE, outfiles=OUTFILES, wipe_existing_mappings=True)
-    mm.run()
-    # parent, where to insert them
-    # el.getparent().attrib
-    # modsource element to replace el.attrib["dest"]
-    # if there are three modsources for the same dest, we have to replace one of them
-    # by default write it at the first free position if not free, replace the last one
+#     mm = MidiMapper(infile=INFILE, outfiles=OUTFILES)
+#     # mm = MidiMapper(infile=INFILE, outfiles=OUTFILES, wipe_existing_mappings=True)
+#     mm.run()
+# parent, where to insert them
+# el.getparent().attrib
+# modsource element to replace el.attrib["dest"]
+# if there are three modsources for the same dest, we have to replace one of them
+# by default write it at the first free position if not free, replace the last one
 
 
 # https://yasoob.me/2018/06/20/an-intro-to-web-scraping-with-lxml-and-python/
@@ -258,5 +279,12 @@ if __name__ == "__main__":
 # - seqpadmapdest
 # - midioutchan
 # - midiseqcellchan
-# TODO
 # - outputbus
+
+
+# TODOs
+# - add list of parameters to a dict for blackbox.
+#   - iterate over these to set the settings
+# - choose an output folder
+# - test the shell scripts to copy blackbox presets
+# - make it ready for shell usage
