@@ -1,16 +1,12 @@
+#!/usr/bin/env python3
+
 import os
 import uuid
+import sys
+import argparse
 
 from lxml import etree
 from copy import copy
-
-# INFILE = "/Users/schwoe/DEV/1010-midi-mapper/test_files/lemondrop/NuDefault.nnl"
-# OUTFILES = [
-#     "/Users/schwoe/DEV/1010-midi-mapper/test_files/lemondrop/TEST MAPPING.nnl",
-#     "/Users/schwoe/DEV/1010-midi-mapper/test_files/lemondrop/NAPILI4.nnl",
-#     "/Users/schwoe/DEV/1010-midi-mapper/test_files/lemondrop/RHYTHMIC DRONEBIRD.nnl",
-# ]
-
 
 from mod_source_list import NUM_SLOTS, ModSourceList
 import models
@@ -18,8 +14,6 @@ import models
 ROOT_FOLDER = os.path.dirname(os.path.abspath(__file__))
 
 DEFAULT_SLOT = "1"
-# OUTFILE_APPENDIX_WIPED = "_mm_wiped"
-# OUTFILE_APPENDIX = "_mm"
 
 PADPARAM_DEVICES = [models.TenTenDevice.BLACKBOX]
 NOTESEQ_PARAM_DEVICES = [models.TenTenDevice.BLACKBOX]
@@ -30,12 +24,13 @@ class MidiMapper:
         self,
         infile: str,
         outfiles: list,
+        overwrite_files: bool = False,
         wipe_existing_mappings: bool = False,
         tenten_device=models.TenTenDevice.BLACKBOX,
         settings=None,
     ):
         self.infile = infile
-        self.outfiles = outfiles
+        self.outfiles = self.filter_outfiles(outfiles)
         self.wipe_existing_mappings = wipe_existing_mappings
         self.parser = etree.XMLParser(recover=True)
         self.root_infile = self.read_xml_file(infile)
@@ -45,6 +40,10 @@ class MidiMapper:
         self.tenten_device = tenten_device
         self.settings = self.read_settings(settings)
         self.outfile_subfolder = self.get_output_folder()
+        self.overwrite_existing_files = overwrite_files
+
+    def filter_outfiles(self, outfiles):
+        return [f for f in outfiles if not f == self.infile]
 
     def read_settings(self, settings):
         # make sure the settings have been passed correctly
@@ -74,18 +73,22 @@ class MidiMapper:
             return root
 
     def write_xml_file(self, filepath, root):
-        # get the filename and prepare the output path
-        file_name = os.path.basename(filepath)
-        base_name, file_extension = os.path.splitext(file_name)
-        new_fp = os.path.join(self.outfile_subfolder, file_name)
+        if self.overwrite_existing_files:
+            new_fp = filepath
+        else:
+            # get the filename and prepare the output path
+            file_name = os.path.basename(filepath)
 
-        # handle filename conflicts by appending an incrementing index
-        index = 1
-        while os.path.exists(new_fp):
-            new_fp = os.path.join(
-                self.outfile_subfolder, f"{base_name}{index}{file_extension}"
-            )
-            index += 1
+            base_name, file_extension = os.path.splitext(file_name)
+            new_fp = os.path.join(self.outfile_subfolder, file_name)
+
+            # handle filename conflicts by appending an incrementing index
+            index = 1
+            while os.path.exists(new_fp):
+                new_fp = os.path.join(
+                    self.outfile_subfolder, f"{base_name}{index}{file_extension}"
+                )
+                index += 1
 
         with open(new_fp, "wb") as f:
             xml = etree.tostring(
@@ -192,11 +195,6 @@ class MidiMapper:
                 for key in self.settings.pad_params:
                     if key in pad_params.attrib:
                         params_outfile.attrib[key] = pad_params.attrib[key]
-                # if "midimode" in pad_params.attrib:
-                #     params_outfile.attrib["midimode"] = pad_params.attrib["midimode"]
-
-                # if "outputbus" in pad_params.attrib:
-                #     params_outfile.attrib["outputbus"] = pad_params.attrib["outputbus"]
 
             except IndexError:
                 print(
@@ -236,18 +234,6 @@ class MidiMapper:
                 for key in self.settings.noteseq_params:
                     if key in noteseq_params.attrib:
                         params_outfile.attrib[key] = noteseq_params.attrib[key]
-                # if "seqpadmapdest" in noteseq_params.attrib:
-                #     params_outfile.attrib["seqpadmapdest"] = noteseq_params.attrib[
-                #         "seqpadmapdest"
-                #     ]
-                # if "midioutchan" in noteseq_params.attrib:
-                #     params_outfile.attrib["midioutchan"] = noteseq_params.attrib[
-                #         "midioutchan"
-                #     ]
-                # if "midiseqcellchan" in noteseq_params.attrib:
-                #     params_outfile.attrib["midiseqcellchan"] = noteseq_params.attrib[
-                #         "midiseqcellchan"
-                #     ]
 
             except IndexError:
                 print(
@@ -265,39 +251,77 @@ class MidiMapper:
         new_elem.attrib["slot"] = slot
         cell_outfile.append(new_elem)
 
-        # insert element
-        # https://stackoverflow.com/questions/68446063/python-lxml-inserting-node-from-one-file-into-another-file-with-proper-structu
-        # replace value
-        # https://stackoverflow.com/questions/41742435/replacing-a-xml-element-with-lxml
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run the MIDI Mapper.")
+    parser.add_argument("-i", "--infile", required=True, help="Input file path")
+    parser.add_argument("-o", "--outfolder", required=True, help="Output folder path")
+    parser.add_argument(
+        "-t",
+        "--tenten_device",
+        required=True,
+        choices=["lemondrop", "blackbox"],
+        help="TenTen device type (lemondrop or blackbox)",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing files in the output folder",
+    )
 
-# if __name__ == "__main__":
+    args = parser.parse_args()
 
-#     mm = MidiMapper(infile=INFILE, outfiles=OUTFILES)
-#     # mm = MidiMapper(infile=INFILE, outfiles=OUTFILES, wipe_existing_mappings=True)
-#     mm.run()
-# parent, where to insert them
-# el.getparent().attrib
-# modsource element to replace el.attrib["dest"]
-# if there are three modsources for the same dest, we have to replace one of them
-# by default write it at the first free position if not free, replace the last one
+    infile = args.infile
+    outfolder = args.outfolder
+    tenten_device = args.tenten_device
+    overwrite = args.overwrite
 
+    # Validate infile
+    if not os.path.isfile(infile):
+        print(f"Error: Infile '{infile}' does not exist.")
+        sys.exit(1)
 
-# https://yasoob.me/2018/06/20/an-intro-to-web-scraping-with-lxml-and-python/
+    # Validate outfolder
+    if not os.path.exists(outfolder):
+        print(f"Error: Outfolder '{outfolder}' does not exist.")
+        sys.exit(1)
 
+    # Collect all .xml files in the outfolder and its subdirectories
+    outfiles = []
+    for root, _, files in os.walk(outfolder):
+        for file in files:
+            if file.endswith(".xml"):
+                outfiles.append(os.path.join(root, file))
 
-# type noteseq
-# seems like we only have to replace the values in seqsublayer="0", because the other seqsublayers never have thos
-# value set
-# - seqpadmapdest
-# - midioutchan
-# - midiseqcellchan
-# - outputbus
+    if not outfiles:
+        print(f"Error: No .xml files found in the outfolder '{outfolder}'.")
+        sys.exit(1)
 
+    # Set device-specific settings
+    if tenten_device == "blackbox":
+        settings = models.BlackboxSettings(
+            pad_params=[
+                models.BlackboxPadParam.MIDIMODE,
+                models.BlackboxPadParam.OUTPUTBUS,
+            ],
+            noteseq_params=[
+                models.BlackboxNoteseqParam.SEQPADMAPDEST,
+                models.BlackboxNoteseqParam.MIDIOUTCHAN,
+                models.BlackboxNoteseqParam.MIDISEQCELLCHAN,
+            ],
+        )
+        device = models.TenTenDevice.BLACKBOX
+    elif tenten_device == "lemondrop":
+        settings = None
+        device = models.TenTenDevice.LEMONDROP
 
-# TODOs
-# - add list of parameters to a dict for blackbox.
-#   - iterate over these to set the settings
-# - choose an output folder
-# - test the shell scripts to copy blackbox presets
-# - make it ready for shell usage
+    # Run the MidiMapper
+    mm = MidiMapper(
+        infile=infile,
+        outfiles=outfiles,
+        tenten_device=device,
+        settings=settings,
+        overwrite_files=overwrite,
+    )
+    mm.run()
+    print(f"Processing completed. Output written to files in '{outfolder}'.")

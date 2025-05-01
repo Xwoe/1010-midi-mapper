@@ -10,7 +10,7 @@ class TenTenDevice(str, Enum):
 
 class BlackboxPadParam(str, Enum):
     MIDIMODE = "midimode"
-    OUTPUT_BUS = "output_bus"
+    OUTPUTBUS = "outputbus"
 
 
 class BlackboxNoteseqParam(str, Enum):
