@@ -31,16 +31,16 @@ class MidiMapper:
     ):
         self.infile = infile
         self.outfiles = self.filter_outfiles(outfiles)
+        self.overwrite_existing_files = overwrite_files
         self.wipe_existing_mappings = wipe_existing_mappings
+        self.tenten_device = tenten_device
+        self.settings = self.read_settings(settings)
         self.parser = etree.XMLParser(recover=True)
         self.root_infile = self.read_xml_file(infile)
         self.modsources_infile = self.filter_midi_modsources(self.root_infile)
         self.pad_params_infile = self.filter_pad_params(self.root_infile)
         self.noteseq_params_infile = self.filter_noteseq_params(self.root_infile)
-        self.tenten_device = tenten_device
-        self.settings = self.read_settings(settings)
         self.outfile_subfolder = self.get_output_folder()
-        self.overwrite_existing_files = overwrite_files
 
     def filter_outfiles(self, outfiles):
         return [f for f in outfiles if not f == self.infile]
@@ -60,8 +60,14 @@ class MidiMapper:
             return None
 
     def get_output_folder(self):
-        # generate a randomly named folder as the output
-        folder = os.path.join(ROOT_FOLDER, str(uuid.uuid4())[:8])
+        try:
+            outfiles_basefolder = os.path.dirname(self.outfiles[0])
+        except IndexError:
+            raise ValueError("No output files provided.")
+        if self.overwrite_existing_files:
+            return os.path.join(outfiles_basefolder, "..")
+        # generate a randomly named sub folder as the output
+        folder = os.path.join(outfiles_basefolder, "..", str(uuid.uuid4())[:8])
         if not os.path.exists(folder):
             os.makedirs(folder)
         return folder
@@ -264,9 +270,10 @@ if __name__ == "__main__":
         help="TenTen device type (lemondrop or blackbox)",
     )
     parser.add_argument(
-        "--overwrite",
+        "-r",
+        "--replace",
         action="store_true",
-        help="Overwrite existing files in the output folder",
+        help="Replace existing files in the output folder",
     )
 
     args = parser.parse_args()
@@ -274,7 +281,7 @@ if __name__ == "__main__":
     infile = args.infile
     outfolder = args.outfolder
     tenten_device = args.tenten_device
-    overwrite = args.overwrite
+    overwrite = args.replace
 
     # Validate infile
     if not os.path.isfile(infile):
@@ -324,4 +331,9 @@ if __name__ == "__main__":
         overwrite_files=overwrite,
     )
     mm.run()
-    print(f"Processing completed. Output written to files in '{outfolder}'.")
+    if overwrite:
+        print(f"Processing completed. Output files replaced in '{outfolder}'.")
+    else:
+        print(
+            f"Processing completed. Output files written to '{mm.outfile_subfolder}'."
+        )
