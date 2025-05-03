@@ -1,1 +1,6 @@
 lxml==5.3.1
+pydantic==2.11.3
+pydantic_core==2.33.1
+xmltodict==0.14.2
+yq==3.4.3
+streamlit==1.45.0
