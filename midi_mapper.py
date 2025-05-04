@@ -9,55 +9,73 @@ from lxml import etree
 from copy import copy
 
 from mod_source_list import NUM_SLOTS, ModSourceList
-import models
+
+# import models
+from models import (
+    BlackboxSettings,
+    BlackboxPadParam,
+    BlackboxNoteseqParam,
+    TenTenDevice,
+)
 
 ROOT_FOLDER = os.path.dirname(os.path.abspath(__file__))
 
 DEFAULT_SLOT = "1"
 
-PADPARAM_DEVICES = [models.TenTenDevice.BLACKBOX]
-NOTESEQ_PARAM_DEVICES = [models.TenTenDevice.BLACKBOX]
+PADPARAM_DEVICES = [TenTenDevice.BLACKBOX]
+NOTESEQ_PARAM_DEVICES = [TenTenDevice.BLACKBOX]
 
 
 class MidiMapper:
     def __init__(
         self,
-        infile: str,
-        outfiles: list,
+        infile: str = "",
+        outfiles: list = [],
         overwrite_files: bool = False,
         wipe_existing_mappings: bool = False,
-        tenten_device=models.TenTenDevice.BLACKBOX,
+        tenten_device=TenTenDevice.BLACKBOX,
         settings=None,
+        write_to_folder: bool = True,
     ):
         self.infile = infile
-        self.outfiles = self.filter_outfiles(outfiles)
+        self.outfiles = outfiles
         self.overwrite_existing_files = overwrite_files
         self.wipe_existing_mappings = wipe_existing_mappings
         self.tenten_device = tenten_device
-        self.settings = self.read_settings(settings)
+        self.settings = settings
         self.parser = etree.XMLParser(recover=True)
-        self.root_infile = self.read_xml_file(infile)
+        self.root_infile = None
+        self.write_to_folder = write_to_folder
+
+    def prepare_data(self):
+        self.outfiles = self.filter_outfiles(self.outfiles)
+        self.check_settings()
+        self.root_infile = self.read_preset_file(self.infile)
         self.modsources_infile = self.filter_midi_modsources(self.root_infile)
         self.pad_params_infile = self.filter_pad_params(self.root_infile)
         self.noteseq_params_infile = self.filter_noteseq_params(self.root_infile)
         self.outfile_subfolder = self.get_output_folder()
 
+    def read_preset_file(self, file_path: str):
+        if self.root_infile is None:
+            self.root_infile = self.read_xml_file(file_path)
+
     def filter_outfiles(self, outfiles):
+        if len(outfiles) == 0:
+            raise ValueError("No output files provided.")
         return [f for f in outfiles if not f == self.infile]
 
-    def read_settings(self, settings):
+    def check_settings(self):
         # make sure the settings have been passed correctly
-        if self.tenten_device == models.TenTenDevice.BLACKBOX:
-            if not isinstance(settings, models.BlackboxSettings):
+        if self.tenten_device == TenTenDevice.BLACKBOX:
+            if not isinstance(self.settings, BlackboxSettings):
                 raise TypeError(
                     "Settings must be of type BlackboxSettings for BLACKBOX device."
+                    + f" Got {type(self.settings)} instead."
                 )
-            return settings
 
-        elif self.tenten_device == models.TenTenDevice.LEMONDROP:
-            return None
         else:
-            return None
+            return
 
     def get_output_folder(self):
         try:
@@ -78,41 +96,15 @@ class MidiMapper:
             root = etree.fromstring(xml, parser=self.parser)
             return root
 
-    def write_xml_file(self, filepath, root):
-        if self.overwrite_existing_files:
-            new_fp = filepath
-        else:
-            # get the filename and prepare the output path
-            file_name = os.path.basename(filepath)
-
-            base_name, file_extension = os.path.splitext(file_name)
-            new_fp = os.path.join(self.outfile_subfolder, file_name)
-
-            # handle filename conflicts by appending an incrementing index
-            index = 1
-            while os.path.exists(new_fp):
-                new_fp = os.path.join(
-                    self.outfile_subfolder, f"{base_name}{index}{file_extension}"
-                )
-                index += 1
-
-        with open(new_fp, "wb") as f:
-            xml = etree.tostring(
-                root,
-                pretty_print=True,
-                encoding="UTF-8",
-                xml_declaration=True,
-            )
-            f.write(xml)
-
     def run(self):
+        self.prepare_data()
         for outfile in self.outfiles:
             root_outfile = self.read_xml_file(outfile)
             self.wipe_modsources(root_outfile)
             self.insert_modsources(root_outfile)
             self.insert_pad_params(root_outfile)
             self.insert_noteseq_params(root_outfile)
-            self.write_xml_file(filepath=outfile, root=root_outfile)
+            self.write_output(outfile=outfile, root=root_outfile)
 
     def filter_midi_modsources(self, root):
         modsources = root.xpath('.//modsource[@src="midicc"]')
@@ -257,6 +249,44 @@ class MidiMapper:
         new_elem.attrib["slot"] = slot
         cell_outfile.append(new_elem)
 
+    def add_outfile(self, outfile):
+        self.outfiles.append(outfile)
+
+    def write_output(self, filepath, root):
+        if self.write_to_folder:
+            self.write_xml_file(filepath=filepath, root=root)
+        else:
+            # write to the original file
+            root = self.read_xml_file(self.infile)
+            self.write_xml_file(self.infile, root)
+
+    def write_xml_file(self, filepath, root):
+        if self.overwrite_existing_files:
+            new_fp = filepath
+        else:
+            # get the filename and prepare the output path
+            file_name = os.path.basename(filepath)
+
+            base_name, file_extension = os.path.splitext(file_name)
+            new_fp = os.path.join(self.outfile_subfolder, file_name)
+
+            # handle filename conflicts by appending an incrementing index
+            index = 1
+            while os.path.exists(new_fp):
+                new_fp = os.path.join(
+                    self.outfile_subfolder, f"{base_name}{index}{file_extension}"
+                )
+                index += 1
+
+        with open(new_fp, "wb") as f:
+            xml = etree.tostring(
+                root,
+                pretty_print=True,
+                encoding="UTF-8",
+                xml_declaration=True,
+            )
+            f.write(xml)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the MIDI Mapper.")
@@ -306,21 +336,21 @@ if __name__ == "__main__":
 
     # Set device-specific settings
     if tenten_device == "blackbox":
-        settings = models.BlackboxSettings(
+        settings = BlackboxSettings(
             pad_params=[
-                models.BlackboxPadParam.MIDIMODE,
-                models.BlackboxPadParam.OUTPUTBUS,
+                BlackboxPadParam.MIDIMODE,
+                BlackboxPadParam.OUTPUTBUS,
             ],
             noteseq_params=[
-                models.BlackboxNoteseqParam.SEQPADMAPDEST,
-                models.BlackboxNoteseqParam.MIDIOUTCHAN,
-                models.BlackboxNoteseqParam.MIDISEQCELLCHAN,
+                BlackboxNoteseqParam.SEQPADMAPDEST,
+                BlackboxNoteseqParam.MIDIOUTCHAN,
+                BlackboxNoteseqParam.MIDISEQCELLCHAN,
             ],
         )
-        device = models.TenTenDevice.BLACKBOX
+        device = TenTenDevice.BLACKBOX
     elif tenten_device == "lemondrop":
         settings = None
-        device = models.TenTenDevice.LEMONDROP
+        device = TenTenDevice.LEMONDROP
 
     # Run the MidiMapper
     mm = MidiMapper(
