@@ -3,6 +3,7 @@ import streamlit as st
 from tempfile import NamedTemporaryFile, TemporaryDirectory, TemporaryFile
 from pathlib import Path
 from io import StringIO
+from tenten_zip_utils import zip_files_to_memory, unzip_files
 
 from midi_mapper import MidiMapper
 from models import (
@@ -42,24 +43,20 @@ if "wipe_existing_mappings" not in st.session_state:
 for key in BlackboxPadParam:
     if key not in st.session_state:
         st.session_state[key] = False
-# if "midimode" not in st.session_state:
-#     st.session_state["midimode"] = None
-# if "outputbus" not in st.session_state:
-#     st.session_state["outputbus"] = None
 
 # Blackbox Noteseq Params
 for key in BlackboxNoteseqParam:
     if key not in st.session_state:
         st.session_state[key] = False
-# if "seqpadmapdest" not in st.session_state:
-#     st.session_state["seqpadmapdest"] = None
-# if "midioutchan" not in st.session_state:
-#     st.session_state["midioutchan"] = None
-# if "midiseqcellchan" not in st.session_state:
-#     st.session_state["midiseqcellchan"] = None
 
-st.write(st.session_state["temp_folder"].name)
+if "zip_output" not in st.session_state:
+    st.session_state["zip_output"] = None
+# st.write(st.session_state["temp_folder"].name)
 
+
+######################################
+# Title
+######################################
 st.title("Midi and Preset Mapper for 1010music Devices")
 st.caption("by [Xwoe](https://github.com/Xwoe/1010-midi-mapper)")
 st.markdown(
@@ -95,7 +92,7 @@ st.session_state["device"] = st.selectbox(
 st.markdown(
     """
     ## 2 Upload your "template" file
-    Upload the files, which contains all the presets and mappings you want to transfer to other presets.
+    Upload the file, which contains all the midi mappings and settings you want to transfer to other presets.
     """
 )
 st.session_state["uploaded_preset"] = st.file_uploader(
@@ -110,8 +107,9 @@ if st.session_state["uploaded_preset"] is not None:
     with NamedTemporaryFile(
         suffix=suffix,
         prefix=st.session_state["uploaded_preset"].name,
-        delete=True,
-        delete_on_close=True,
+        delete=False,
+        delete_on_close=False,
+        dir=st.session_state["temp_folder"].name,
     ) as temp_file:
         temp_file.write(st.session_state["uploaded_preset"].getvalue())
         temp_file.seek(0)
@@ -217,9 +215,15 @@ if st.session_state["uploaded_outfiles"] is not None:
         use_container_width=False,
     ):
         try:
+            st.session_state["mm"].overwrite_files = True
+            st.session_state["mm"].wipe_existing_mappings = st.session_state[
+                "wipe_existing_mappings"
+            ]
             st.session_state["mm"].tenten_device = st.session_state["device"]
             st.session_state["mm"].settings = read_settings()
-            st.session_state["mm"].run()
+            result_files = st.session_state["mm"].run()
+            # TODO read zip file to memory and make downloadable
+            st.session_state["zip_output"] = zip_files_to_memory(result_files)
             st.success("Mapping completed successfully.")
             st.session_state["temp_folder"].cleanup()
 

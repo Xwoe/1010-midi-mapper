@@ -46,11 +46,12 @@ class MidiMapper:
         self.parser = etree.XMLParser(recover=True)
         self.root_infile = None
         self.write_to_folder = write_to_folder
+        self.result_files = []
 
     def prepare_data(self):
         self.outfiles = self.filter_outfiles(self.outfiles)
         self.check_settings()
-        self.root_infile = self.read_preset_file(self.infile)
+        self.read_preset_file(self.infile)
         self.modsources_infile = self.filter_midi_modsources(self.root_infile)
         self.pad_params_infile = self.filter_pad_params(self.root_infile)
         self.noteseq_params_infile = self.filter_noteseq_params(self.root_infile)
@@ -83,9 +84,11 @@ class MidiMapper:
         except IndexError:
             raise ValueError("No output files provided.")
         if self.overwrite_existing_files:
-            return os.path.join(outfiles_basefolder, "..")
+            return os.path.abspath(os.path.join(outfiles_basefolder, ".."))
         # generate a randomly named sub folder as the output
-        folder = os.path.join(outfiles_basefolder, "..", str(uuid.uuid4())[:8])
+        folder = os.path.abspath(
+            os.path.join(outfiles_basefolder, "..", str(uuid.uuid4())[:8])
+        )
         if not os.path.exists(folder):
             os.makedirs(folder)
         return folder
@@ -104,7 +107,9 @@ class MidiMapper:
             self.insert_modsources(root_outfile)
             self.insert_pad_params(root_outfile)
             self.insert_noteseq_params(root_outfile)
-            self.write_output(outfile=outfile, root=root_outfile)
+            result_file = self.write_xml_file(outfile=outfile, root=root_outfile)
+            self.result_files.append(result_file)
+        return self.result_files
 
     def filter_midi_modsources(self, root):
         modsources = root.xpath('.//modsource[@src="midicc"]')
@@ -252,13 +257,13 @@ class MidiMapper:
     def add_outfile(self, outfile):
         self.outfiles.append(outfile)
 
-    def write_output(self, filepath, root):
-        if self.write_to_folder:
-            self.write_xml_file(filepath=filepath, root=root)
-        else:
-            # write to the original file
-            root = self.read_xml_file(self.infile)
-            self.write_xml_file(self.infile, root)
+    # def write_output(self, filepath, root) -> str:
+    #     if self.write_to_folder:
+    #         self.write_xml_file(filepath=filepath, root=root)
+    #     else:
+    #         # write to the original file
+    #         root = self.read_xml_file(self.infile)
+    #         return self.write_xml_file(self.infile, root)
 
     def write_xml_file(self, filepath, root):
         if self.overwrite_existing_files:
@@ -286,6 +291,8 @@ class MidiMapper:
                 xml_declaration=True,
             )
             f.write(xml)
+
+        return new_fp
 
 
 if __name__ == "__main__":
