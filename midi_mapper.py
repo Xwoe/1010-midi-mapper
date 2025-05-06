@@ -107,7 +107,7 @@ class MidiMapper:
             self.insert_modsources(root_outfile)
             self.insert_pad_params(root_outfile)
             self.insert_noteseq_params(root_outfile)
-            result_file = self.write_xml_file(outfile=outfile, root=root_outfile)
+            result_file = self.write_xml_file(filepath=outfile, root=root_outfile)
             self.result_files.append(result_file)
         return self.result_files
 
