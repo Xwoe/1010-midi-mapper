@@ -6,7 +6,7 @@ A tool to transfer MIDI mappings from one project to multiple other project.
 ### Run the whole chain locally for blackbox presets
 Make all the script executable:
 ```bash
-chmod +x blackbox_process.sh.sh
+chmod +x blackbox_process.sh
 ```
 To run the processing and put the processed files in a new (randomly named) folder:
  ```bash
