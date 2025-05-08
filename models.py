@@ -5,7 +5,6 @@ from enum import Enum
 class TenTenDevice(str, Enum):
     BLACKBOX = "blackbox"
     LEMONDROP = "lemondrop"
-    # GENERICNANOBOX = "genericnanobox"
 
 
 class BlackboxPadParam(str, Enum):
@@ -40,5 +39,7 @@ class BlackboxSettings(BaseModel):
 TENTEN_EXTENSIONS = {
     "blackbox": "xml",
     "lemondrop": "nnl",
-    # "genericnanobox": "*",
 }
+
+# the products for which we require to upload zip files
+TENTEN_ZIP_PRODUCTS = [TenTenDevice.BLACKBOX]

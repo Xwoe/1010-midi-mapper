@@ -35,17 +35,15 @@ class MidiMapper:
         wipe_existing_mappings: bool = False,
         tenten_device=TenTenDevice.BLACKBOX,
         settings=None,
-        write_to_folder: bool = True,
     ):
         self.infile = infile
         self.outfiles = outfiles
-        self.overwrite_existing_files = overwrite_files
+        self.overwrite_files = overwrite_files
         self.wipe_existing_mappings = wipe_existing_mappings
         self.tenten_device = tenten_device
         self.settings = settings
         self.parser = etree.XMLParser(recover=True)
         self.root_infile = None
-        self.write_to_folder = write_to_folder
         self.result_files = []
 
     def prepare_data(self):
@@ -83,7 +81,7 @@ class MidiMapper:
             outfiles_basefolder = os.path.dirname(self.outfiles[0])
         except IndexError:
             raise ValueError("No output files provided.")
-        if self.overwrite_existing_files:
+        if self.overwrite_files:
             return os.path.abspath(os.path.join(outfiles_basefolder, ".."))
         # generate a randomly named sub folder as the output
         folder = os.path.abspath(
@@ -257,16 +255,8 @@ class MidiMapper:
     def add_outfile(self, outfile):
         self.outfiles.append(outfile)
 
-    # def write_output(self, filepath, root) -> str:
-    #     if self.write_to_folder:
-    #         self.write_xml_file(filepath=filepath, root=root)
-    #     else:
-    #         # write to the original file
-    #         root = self.read_xml_file(self.infile)
-    #         return self.write_xml_file(self.infile, root)
-
     def write_xml_file(self, filepath, root):
-        if self.overwrite_existing_files:
+        if self.overwrite_files:
             new_fp = filepath
         else:
             # get the filename and prepare the output path

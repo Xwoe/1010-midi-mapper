@@ -3,11 +3,13 @@ import streamlit as st
 from tempfile import NamedTemporaryFile, TemporaryDirectory, TemporaryFile
 from pathlib import Path
 from io import StringIO
-from tenten_zip_utils import zip_files_to_memory, unzip_files
+from tenten_zip_utils import zip_files_to_memory, unzip_files, zip_folder_to_memory
 
 from midi_mapper import MidiMapper
 from models import (
     TENTEN_EXTENSIONS,
+    TENTEN_ZIP_PRODUCTS,
+    TenTenDevice,
     BlackboxSettings,
     BlackboxPadParam,
     BlackboxNoteseqParam,
@@ -30,6 +32,14 @@ if "temp_folder" not in st.session_state:
         prefix="tenten_folder_",
         delete=False,
     )
+
+if "temp_zip_extraction_folder" not in st.session_state:
+    st.session_state["temp_zip_extraction_folder"] = TemporaryDirectory(
+        suffix="",
+        prefix="tenten_zip_extraction_",
+        delete=False,
+    )
+
 if "device" not in st.session_state:
     st.session_state["device"] = None
 
@@ -58,21 +68,19 @@ for key in BlackboxNoteseqParam:
     if key not in st.session_state:
         st.session_state[key] = False
 
+if "is_zipfile_upload" not in st.session_state:
+    st.session_state["is_zipfile_upload"] = False
+
 if "zip_output" not in st.session_state:
     st.session_state["zip_output"] = None
-# st.write(st.session_state["temp_folder"].name)
 
 
-def cleanup_temp_folder():
+def cleanup_temp_folders():
     """
     Cleans up the temporary folder created for file uploads.
     """
-    # if st.session_state["temp_folder"] is not None:
-    #     st.session_state["uploaded_preset"] = None
-    #     st.session_state["uploaded_outfiles"] = None
-    #     st.session_state["preset_uploaded"] = False
     st.session_state["temp_folder"].cleanup()
-    # st.session_state["temp_folder"] = None
+    st.session_state["temp_zip_extraction_folder"].cleanup()
 
 
 ######################################
@@ -82,7 +90,10 @@ st.title("Midi and Preset Mapper for 1010music Devices")
 st.caption("by [Xwoe](https://github.com/Xwoe/1010-midi-mapper)")
 st.markdown(
     """
-    ### TODO
+    With this little tool you can transfer settings like Midi CC mappings from one template to multiple others.
+    For the Blackbox you can also transfer a selection of settings for the pads and the sequences.
+
+    This tool is still a work in progress and more features and devices will be added in the future.
     """
 )
 
@@ -107,14 +118,15 @@ def onselectbox_change():
 
 st.session_state["device"] = st.selectbox(
     label="Select your device",
-    options=[
-        "blackbox",
-        "lemondrop",
-        "genericnanobox",
-    ],
+    options=[t.value for t in TenTenDevice],
     index=None,
     disabled=st.session_state["preset_uploaded"],
 )
+st.session_state["is_zipfile_upload"] = (
+    st.session_state["device"] in TENTEN_ZIP_PRODUCTS
+)
+st.session_state["file_extension"] = TENTEN_EXTENSIONS.get(st.session_state["device"])
+
 
 ######################################
 # Upload Template
@@ -130,7 +142,7 @@ if st.session_state["device"] is not None:
     st.session_state["uploaded_preset"] = st.file_uploader(
         "Choose a file",
         type=[
-            TENTEN_EXTENSIONS[st.session_state["device"]],
+            st.session_state["file_extension"],
         ],
         disabled=st.session_state["zip_output"] is not None,
     )
@@ -164,39 +176,82 @@ if st.session_state["preset_uploaded"]:
     Upload the files, to which you want to map the settings from the template.
     """
     )
-    st.session_state["uploaded_outfiles"] = st.file_uploader(
-        "Choose a file",
-        type=[
-            TENTEN_EXTENSIONS[st.session_state["device"]],
-        ],
-        accept_multiple_files=True,
-        disabled=st.session_state["zip_output"] is not None,
-    )
-    if (
-        st.session_state["uploaded_outfiles"] is not None
-        and st.session_state["disable_outfile_upload"] is False
-    ):
-        for uploaded_file in st.session_state["uploaded_outfiles"]:
-            suffix = Path(uploaded_file.name).suffix
 
+    #### Zipfile upload
+    if st.session_state["is_zipfile_upload"]:
+
+        st.markdown(
+            """
+            #### Zip you projects before uploading
+            - copy the project folders you want to map into a new folder
+            - _please_ remove all .wav files from the project folders (memory is limited on this server ;))
+            - zip the folder and upload it here
+            """
+        )
+
+        st.session_state["uploaded_outfiles"] = st.file_uploader(
+            "Choose a file",
+            type=["zip"],
+            disabled=st.session_state["zip_output"] is not None,
+        )
+        if (
+            st.session_state["uploaded_outfiles"] is not None
+            and st.session_state["disable_outfile_upload"] is False
+        ):
             with NamedTemporaryFile(
-                suffix=suffix,
-                prefix=uploaded_file.name,
+                suffix=".zip",
+                prefix=st.session_state["uploaded_outfiles"].name,
                 delete=False,
                 delete_on_close=False,
                 dir=st.session_state["temp_folder"].name,
             ) as temp_file:
-                temp_file.write(uploaded_file.getvalue())
+                temp_file.write(st.session_state["uploaded_outfiles"].getvalue())
                 temp_file.seek(0)
-                st.session_state["mm"].add_outfile(temp_file.name)
-        if len(st.session_state["mm"].outfiles) > 0:
-            st.session_state["disable_outfile_upload"] = True
+                file_paths = unzip_files(
+                    zip_name=temp_file.name,
+                    extract_to=st.session_state["temp_zip_extraction_folder"].name,
+                    file_extension=st.session_state["file_extension"],
+                )
+                for file_path in file_paths:
+                    st.session_state["mm"].add_outfile(file_path)
+            if len(st.session_state["mm"].outfiles) > 0:
+                st.session_state["disable_outfile_upload"] = True
+
+    #### Multiple files upload
+    else:
+        st.session_state["uploaded_outfiles"] = st.file_uploader(
+            "Choose a file",
+            type=[
+                TENTEN_EXTENSIONS[st.session_state["device"]],
+            ],
+            accept_multiple_files=True,
+            disabled=st.session_state["zip_output"] is not None,
+        )
+        if (
+            st.session_state["uploaded_outfiles"] is not None
+            and st.session_state["disable_outfile_upload"] is False
+        ):
+            for uploaded_file in st.session_state["uploaded_outfiles"]:
+                suffix = Path(uploaded_file.name).suffix
+
+                with NamedTemporaryFile(
+                    suffix=suffix,
+                    prefix=uploaded_file.name,
+                    delete=False,
+                    delete_on_close=False,
+                    dir=st.session_state["temp_folder"].name,
+                ) as temp_file:
+                    temp_file.write(uploaded_file.getvalue())
+                    temp_file.seek(0)
+                    st.session_state["mm"].add_outfile(temp_file.name)
+            if len(st.session_state["mm"].outfiles) > 0:
+                st.session_state["disable_outfile_upload"] = True
 
 
 ######################################
 # 4 Settings
 ######################################
-if st.session_state["uploaded_outfiles"] is not None:
+if st.session_state["disable_outfile_upload"]:
     st.markdown(
         """
     ## 4 Select your settings
@@ -235,7 +290,6 @@ if st.session_state["uploaded_outfiles"] is not None:
 
 
 def read_settings():
-    st.write("device: ", st.session_state["device"])
     if st.session_state["device"] == "blackbox":
         bb_settings = BlackboxSettings()
         bb_settings.pad_params = [
@@ -255,7 +309,7 @@ def read_settings():
 # Run Mapping
 ######################################
 
-if st.session_state["uploaded_outfiles"] is not None:
+if st.session_state["disable_outfile_upload"]:
     opti_label = "Transfer Preset Settings"
     if st.button(
         label=opti_label,
@@ -275,15 +329,22 @@ if st.session_state["uploaded_outfiles"] is not None:
             st.session_state["zip_out_name"] = (
                 f"{st.session_state['device']}_mapped_files.zip"
             )
-            st.session_state["zip_output"] = zip_files_to_memory(
-                file_list=result_files, zipfile_name=st.session_state["zip_out_name"]
-            )
+            if st.session_state["is_zipfile_upload"]:
+                # get the folder of the extracted zip file
+                st.session_state["zip_output"] = zip_folder_to_memory(
+                    st.session_state["temp_zip_extraction_folder"].name
+                )
+            else:
+                st.session_state["zip_output"] = zip_files_to_memory(
+                    file_list=result_files,
+                    cleanup=True,
+                )
             st.success("Mapping completed successfully.")
-            cleanup_temp_folder()
+            cleanup_temp_folders()
 
         except Exception as e:
             st.error(f"Error during mapping: {e}")
-            cleanup_temp_folder()
+            cleanup_temp_folders()
 
 
 ######################################

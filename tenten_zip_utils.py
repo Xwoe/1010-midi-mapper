@@ -15,7 +15,24 @@ def zip_files(file_list, zip_name):
             zipf.write(file, arcname=file.name)
 
 
-def zip_files_to_memory(file_list, zipfile_name="output.zip"):
+def clean_up_filename(file_path):
+    """
+    Cleans up the filename by removing the extension and replacing spaces with underscores.
+    """
+    # Remove the file extension
+    file_name = file_path.split("/")[-1]
+    # remove the random bit before the file extension and after the .
+    parts = file_name.split(".")
+    try:
+        parts.pop(-2)
+        file_name = ".".join(parts)
+        return file_name
+
+    except IndexError:
+        return file_name
+
+
+def zip_files_to_memory(file_list, cleanup=False):
     """
     Zips all files in file_list into a single zip file in memory.
 
@@ -32,18 +49,35 @@ def zip_files_to_memory(file_list, zipfile_name="output.zip"):
         for file_path in file_list:
             with open(file_path, "rb") as f:
                 file_data = f.read()
-                zipf.writestr(file_path.split("/")[-1], file_data)
+                if cleanup:
+                    file_name = clean_up_filename(file_path)
+                else:
+                    file_name = file_path.split("/")[-1]
+                zipf.writestr(file_name, file_data)
 
     zip_buffer.seek(0)
     return zip_buffer
 
 
-def unzip_files(zip_name, extract_to):
+def unzip_files(zip_name, extract_to, file_extension=None):
     """
     Unzips the zip file zip_name into the directory extract_to.
+    There it looks for files with the given file_extension and returns their paths.
     """
     with zipfile.ZipFile(zip_name, "r") as zipf:
         zipf.extractall(extract_to)
+
+    # If a file extension is provided, collect all the files in all subolders with that extension
+    # and return their file paths
+    if file_extension:
+        # get a list of all files with the given extension in all subfolders of extract_to
+        # and return their file paths
+        file_paths = []
+        for root, _, files in os.walk(extract_to):
+            for file in files:
+                if file.endswith(file_extension):
+                    file_paths.append(os.path.join(root, file))
+        return file_paths
 
 
 def zip_folder_to_memory(folder_path):
