@@ -75,6 +75,8 @@ def unzip_files(zip_name, extract_to, file_extension=None):
         file_paths = []
         for root, _, files in os.walk(extract_to):
             for file in files:
+                if "__MACOSX" in file:
+                    continue
                 if file.endswith(file_extension):
                     file_paths.append(os.path.join(root, file))
         return file_paths
