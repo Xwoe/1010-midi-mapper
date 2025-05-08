@@ -100,13 +100,17 @@ class MidiMapper:
     def run(self):
         self.prepare_data()
         for outfile in self.outfiles:
-            root_outfile = self.read_xml_file(outfile)
-            self.wipe_modsources(root_outfile)
-            self.insert_modsources(root_outfile)
-            self.insert_pad_params(root_outfile)
-            self.insert_noteseq_params(root_outfile)
-            result_file = self.write_xml_file(filepath=outfile, root=root_outfile)
-            self.result_files.append(result_file)
+            try:
+                root_outfile = self.read_xml_file(outfile)
+                self.wipe_modsources(root_outfile)
+                self.insert_modsources(root_outfile)
+                self.insert_pad_params(root_outfile)
+                self.insert_noteseq_params(root_outfile)
+                result_file = self.write_xml_file(filepath=outfile, root=root_outfile)
+                self.result_files.append(result_file)
+            except Exception as e:
+                print(f"Error processing file {outfile}: {e}")
+                continue
         return self.result_files
 
     def filter_midi_modsources(self, root):
