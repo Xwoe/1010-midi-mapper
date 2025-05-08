@@ -210,6 +210,7 @@ if st.session_state["preset_uploaded"]:
             st.session_state["uploaded_outfiles"] is not None
             and st.session_state["disable_outfile_upload"] is False
         ):
+
             with NamedTemporaryFile(
                 suffix=".zip",
                 prefix=st.session_state["uploaded_outfiles"].name,
@@ -352,7 +353,6 @@ if st.session_state["disable_outfile_upload"]:
                     cleanup=True,
                 )
             st.success("Mapping completed successfully.")
-            cleanup_temp_folders()
 
         except Exception as e:
             st.error(f"Error during mapping: {e}")
@@ -363,7 +363,7 @@ if st.session_state["disable_outfile_upload"]:
 # 5 Download Button
 ######################################
 if st.session_state["zip_output"] is not None:
-
+    cleanup_temp_folders()
     st.markdown(
         """
     ## 5 Download your mapped files
