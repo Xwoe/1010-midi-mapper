@@ -75,14 +75,6 @@ if "zip_output" not in st.session_state:
     st.session_state["zip_output"] = None
 
 
-def cleanup_temp_folders():
-    """
-    Cleans up the temporary folder created for file uploads.
-    """
-    st.session_state["temp_folder"].cleanup()
-    st.session_state["temp_zip_extraction_folder"].cleanup()
-
-
 ######################################
 # Title
 ######################################
@@ -96,6 +88,26 @@ st.markdown(
     This tool is still a work in progress and more features and devices will be added in the future.
     """
 )
+
+
+def cleanup_temp_folders():
+    """
+    Cleans up the temporary folder created for file uploads.
+    """
+    st.session_state["temp_folder"].cleanup()
+    st.session_state["temp_zip_extraction_folder"].cleanup()
+
+
+# if st.button(
+#     label="Reset",
+#     type="primary",
+#     use_container_width=False,
+# ):
+#     cleanup_temp_folders()
+#     # Delete all the items in Session state
+#     for key in st.session_state.keys():
+#         st.session_state[key] = None
+
 
 ######################################
 # Device Selection
