@@ -103,6 +103,9 @@ def reset_midi_mapper():
     Resets the MidiMapper instance and clears the uploaded files.
     """
     st.session_state["mm"] = MidiMapper()
+    # the outfiles were not cleared in the MidiMapper instance,
+    # so we need to clear them manually I guess
+    st.session_state["mm"].reset()
     st.session_state["uploaded_preset"] = None
     st.session_state["uploaded_outfiles"] = None
 

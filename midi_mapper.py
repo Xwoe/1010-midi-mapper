@@ -45,6 +45,25 @@ class MidiMapper:
         self.parser = etree.XMLParser(recover=True)
         self.root_infile = None
         self.result_files = []
+        self.modsources_infile = []
+        self.pad_params_infile = []
+        self.noteseq_params_infile = []
+        self.outfile_subfolder = None
+
+    def reset(self):
+        self.infile = ""
+        self.outfiles = []
+        self.overwrite_files = False
+        self.wipe_existing_mappings = False
+        self.tenten_device = None
+        self.settings = None
+        self.parser = etree.XMLParser(recover=True)
+        self.root_infile = None
+        self.result_files = []
+        self.modsources_infile = []
+        self.pad_params_infile = []
+        self.noteseq_params_infile = []
+        self.outfile_subfolder = None
 
     def prepare_data(self):
         self.outfiles = self.filter_outfiles(self.outfiles)
