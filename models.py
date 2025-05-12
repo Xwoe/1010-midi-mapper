@@ -5,6 +5,9 @@ from enum import Enum
 class TenTenDevice(str, Enum):
     BLACKBOX = "blackbox"
     LEMONDROP = "lemondrop"
+    FIREBALL = "fireball"
+    RAZZMATAZZ = "razzmatazz"
+    TANGERINE = "tangerine"
 
 
 class BlackboxPadParam(str, Enum):
@@ -25,9 +28,9 @@ class BlackboxNoteseqParam(str, Enum):
 
 
 BB_NOTESEQ_PARAM_DESCRIPTION = {
-    BlackboxNoteseqParam.SEQPADMAPDEST: "Seq pad map destination",
-    BlackboxNoteseqParam.MIDIOUTCHAN: "MIDI out channel",
-    BlackboxNoteseqParam.MIDISEQCELLCHAN: "MIDI seq cell channel",
+    BlackboxNoteseqParam.SEQPADMAPDEST: "Sequence Pad Destination",
+    BlackboxNoteseqParam.MIDIOUTCHAN: "MIDI Out Channel",
+    BlackboxNoteseqParam.MIDISEQCELLCHAN: "MIDI Sequence Cell Channel",
 }
 
 
@@ -39,7 +42,10 @@ class BlackboxSettings(BaseModel):
 TENTEN_EXTENSIONS = {
     "blackbox": "xml",
     "lemondrop": "nnl",
+    "fireball": "nnf",
+    "razzmatazz": "nnr",
+    "tangerine": "xml",
 }
 
 # the products for which we require to upload zip files
-TENTEN_ZIP_PRODUCTS = [TenTenDevice.BLACKBOX]
+TENTEN_ZIP_PRODUCTS = [TenTenDevice.BLACKBOX, TenTenDevice.TANGERINE]
