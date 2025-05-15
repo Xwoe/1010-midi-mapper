@@ -98,19 +98,20 @@ def cleanup_temp_folders():
     st.session_state["temp_zip_extraction_folder"].cleanup()
 
 
-# if st.button(
-#     label="Reset",
-#     type="primary",
-#     use_container_width=False,
-# ):
-#     cleanup_temp_folders()
-#     # Delete all the items in Session state
-#     for key in st.session_state.keys():
-#         st.session_state[key] = None
+def reset_midi_mapper():
+    """
+    Resets the MidiMapper instance and clears the uploaded files.
+    """
+    st.session_state["mm"] = MidiMapper()
+    # the outfiles were not cleared in the MidiMapper instance,
+    # so we need to clear them manually I guess
+    st.session_state["mm"].reset()
+    st.session_state["uploaded_preset"] = None
+    st.session_state["uploaded_outfiles"] = None
 
 
 ######################################
-# Device Selection
+# 1 Device Selection
 ######################################
 
 
@@ -141,7 +142,7 @@ st.session_state["file_extension"] = TENTEN_EXTENSIONS.get(st.session_state["dev
 
 
 ######################################
-# Upload Template
+# 2 Upload Template
 ######################################
 
 if st.session_state["device"] is not None:
@@ -158,6 +159,8 @@ if st.session_state["device"] is not None:
         ],
         disabled=st.session_state["zip_output"] is not None,
     )
+    if st.session_state["uploaded_preset"] is None:
+        reset_midi_mapper()
     if (
         st.session_state["uploaded_preset"] is not None
         and not st.session_state["disable_preset_upload"]
@@ -319,7 +322,7 @@ def read_settings():
 
 
 ######################################
-# Run Mapping
+# 5 Run Mapping
 ######################################
 
 if st.session_state["disable_outfile_upload"]:
