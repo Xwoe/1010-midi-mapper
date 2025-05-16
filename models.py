@@ -78,7 +78,6 @@ TENTEN_MIDIMAP_ITEMS = [TenTenDevice.RAZZMATAZZ]
 TENTEN_ROW_COLUMN_LAYER = [
     TenTenDevice.BLACKBOX,
     TenTenDevice.TANGERINE,
-    TenTenDevice.LEMONDROP,
     TenTenDevice.FIREBALL,
 ]
 
@@ -86,6 +85,7 @@ TENTEN_ROW_COLUMN_LAYER = [
 # row`, `column` and `synth`
 TENTEN_ROW_COLUMN_SYNTH = [
     TenTenDevice.RAZZMATAZZ,
+    TenTenDevice.LEMONDROP,
 ]
 
 # checkboxes will be set to false for the keys in this list
