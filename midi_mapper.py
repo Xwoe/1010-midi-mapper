@@ -16,6 +16,11 @@ from models import (
     BlackboxPadParam,
     BlackboxNoteseqParam,
     TenTenDevice,
+    ModSources,
+    TENTEN_MIDIMAP_ITEMS,
+    GeneralMidiSettings,
+    TENTEN_ROW_COLUMN_LAYER,
+    TENTEN_ROW_COLUMN_SYNTH,
 )
 
 ROOT_FOLDER = os.path.dirname(os.path.abspath(__file__))
@@ -32,20 +37,22 @@ class MidiMapper:
         infile: str = "",
         outfiles: list = [],
         overwrite_files: bool = False,
-        wipe_existing_mappings: bool = False,
         tenten_device=TenTenDevice.BLACKBOX,
-        settings=None,
+        general_midi_settings=None,
+        device_settings=None,
     ):
         self.infile = infile
         self.outfiles = outfiles
         self.overwrite_files = overwrite_files
-        self.wipe_existing_mappings = wipe_existing_mappings
+        self.wipe_existing_mappings = True
         self.tenten_device = tenten_device
-        self.settings = settings
+        self.general_midi_settings = general_midi_settings
+        self.device_settings = device_settings
         self.parser = etree.XMLParser(recover=True)
         self.root_infile = None
         self.result_files = []
         self.modsources_infile = []
+        self.mapitems_infile = []
         self.pad_params_infile = []
         self.noteseq_params_infile = []
         self.outfile_subfolder = None
@@ -54,13 +61,14 @@ class MidiMapper:
         self.infile = ""
         self.outfiles = []
         self.overwrite_files = False
-        self.wipe_existing_mappings = False
+        self.wipe_existing_mappings = True
         self.tenten_device = None
-        self.settings = None
+        self.general_midi_settings = None
         self.parser = etree.XMLParser(recover=True)
         self.root_infile = None
         self.result_files = []
         self.modsources_infile = []
+        self.mapitems_infile = []
         self.pad_params_infile = []
         self.noteseq_params_infile = []
         self.outfile_subfolder = None
@@ -70,6 +78,7 @@ class MidiMapper:
         self.check_settings()
         self.read_preset_file(self.infile)
         self.modsources_infile = self.filter_midi_modsources(self.root_infile)
+        self.mapitems_infile = self.filter_map_items(self.root_infile)
         self.pad_params_infile = self.filter_pad_params(self.root_infile)
         self.noteseq_params_infile = self.filter_noteseq_params(self.root_infile)
         self.outfile_subfolder = self.get_output_folder()
@@ -86,12 +95,11 @@ class MidiMapper:
     def check_settings(self):
         # make sure the settings have been passed correctly
         if self.tenten_device == TenTenDevice.BLACKBOX:
-            if not isinstance(self.settings, BlackboxSettings):
+            if not isinstance(self.device_settings, BlackboxSettings):
                 raise TypeError(
                     "Settings must be of type BlackboxSettings for BLACKBOX device."
-                    + f" Got {type(self.settings)} instead."
+                    + f" Got {type(self.device_settings)} instead."
                 )
-
         else:
             return
 
@@ -122,7 +130,9 @@ class MidiMapper:
             try:
                 root_outfile = self.read_xml_file(outfile)
                 self.wipe_modsources(root_outfile)
+                self.wipe_map_items(root_outfile)
                 self.insert_modsources(root_outfile)
+                self.insert_map_items(root_outfile)
                 self.insert_pad_params(root_outfile)
                 self.insert_noteseq_params(root_outfile)
                 result_file = self.write_xml_file(filepath=outfile, root=root_outfile)
@@ -133,8 +143,18 @@ class MidiMapper:
         return self.result_files
 
     def filter_midi_modsources(self, root):
-        modsources = root.xpath('.//modsource[@src="midicc"]')
+        modsources = []
+        for modsource in self.general_midi_settings.mod_sources:
+            modsources += root.xpath(f'.//modsource[@src="{modsource.value}"]')
+
         return modsources
+
+    def filter_map_items(self, root):
+        mapitems = []
+        if self.tenten_device in TENTEN_MIDIMAP_ITEMS:
+            # for these devices the midimap is under `midimap` and the node names are `mapitem`
+            mapitems = root.xpath(f".//midimap/mapitem")
+        return mapitems
 
     def filter_pad_params(self, root):
         padparams = root.xpath('.//cell[@type="sample"]/params')
@@ -148,21 +168,47 @@ class MidiMapper:
         if not self.wipe_existing_mappings:
             return
         # remove all modsources from the outfile
-        modsources = root_outfile.xpath('.//modsource[@src="midicc"]')
-        for modsource in modsources:
-            self.delete_modsource(modsource)
+        for modsource in self.general_midi_settings.mod_sources:
+            modsources = root_outfile.xpath(f'.//modsource[@src="{modsource.value}"]')
+            for modsource in modsources:
+                self.delete_node(modsource)
 
-    def delete_modsource(self, modsource):
-        parent = modsource.getparent()
-        parent.remove(modsource)
+    def wipe_map_items(self, root_outfile):
+        if not self.wipe_existing_mappings:
+            return
+        # remove all mapitems from the outfile
+        # we will just delete the whole midimap node, if it exist, because
+        # we will add it in again later
+        midimap = root_outfile.xpath(f".//midimap")
+        if len(midimap) > 0:
+            self.delete_node(midimap[0])
+
+    def delete_node(self, node):
+        parent = node.getparent()
+        parent.remove(node)
+
+    def get_cell_from_outfile(self, root_outfile, parent_attrib_infile):
+        cell_outfile = []
+        if self.tenten_device in TENTEN_ROW_COLUMN_LAYER:
+            # for these devices the midimap is under `midimap` and the node names are `mapitem`
+            cell_outfile = root_outfile.xpath(
+                f'.//cell[@row="{parent_attrib_infile["row"]}"][@column="{parent_attrib_infile["column"]}"]'
+                + f'[@layer="{parent_attrib_infile["layer"]}"]'
+            )
+        elif self.tenten_device in TENTEN_ROW_COLUMN_SYNTH:
+            cell_outfile = root_outfile.xpath(
+                f'.//cell[@row="{parent_attrib_infile["row"]}"][@column="{parent_attrib_infile["column"]}"]'
+                + f'[@synth="{parent_attrib_infile["synth"]}"]'
+            )
+        return cell_outfile
 
     def insert_modsources(self, root_outfile):
         for mod_infile in self.modsources_infile:
             # get element from infile
             parent_attrib_infile = mod_infile.getparent().attrib
             # get cell from outfile at the same position
-            cell_outfile = root_outfile.xpath(
-                f'.//cell[@row="{parent_attrib_infile["row"]}"][@column="{parent_attrib_infile["column"]}"]'
+            cell_outfile = self.get_cell_from_outfile(
+                root_outfile, parent_attrib_infile
             )
             try:
                 cell_outfile = cell_outfile[0]
@@ -188,7 +234,7 @@ class MidiMapper:
             first_cc_modsource = mod_same_dest.first_cc_modsource()
             if first_cc_modsource is not None:
                 slot = first_cc_modsource.attrib["slot"]
-                self.delete_modsource(first_cc_modsource)
+                self.delete_node(first_cc_modsource)
                 self.add_to_free_slot(mod_infile, cell_outfile, slot)
                 continue
 
@@ -196,12 +242,30 @@ class MidiMapper:
             # (because in blackbox 0 and 2 are sometimes set by default)
             middle_elem = mod_same_dest.elem_at_slot(DEFAULT_SLOT)
             if middle_elem is not None:
-                self.delete_modsource(middle_elem)
+                self.delete_node(middle_elem)
 
             # create a new one
             new_elem = copy(mod_infile)
             new_elem.attrib["slot"] = DEFAULT_SLOT
             cell_outfile.append(new_elem)
+
+    def insert_map_items(self, root_outfile):
+        if not self.tenten_device in TENTEN_MIDIMAP_ITEMS:
+            return
+        midimap = root_outfile.xpath(f".//midimap")
+        if not midimap:
+            session = root_outfile.xpath(".//session")[0]
+            # we have to create a new midimap element
+            midimap = etree.SubElement(session, "midimap")
+            # midimap = root_outfile.xpath(f".//midimap")
+        for mapitem in self.mapitems_infile:
+            # get cell from outfile at the same position
+            try:
+                new_elem = copy(mapitem)
+                midimap.append(new_elem)
+            except Exception as e:
+                print(f"Error while inserting map items: {e}")
+                continue
 
     def insert_pad_params(self, root_outfile):
         if not self.tenten_device in PADPARAM_DEVICES:
@@ -216,7 +280,7 @@ class MidiMapper:
                     + f'[@layer="{pad_params_cell.attrib["layer"]}"]/params'
                 )
                 params_outfile = params_outfile[0]
-                for key in self.settings.pad_params:
+                for key in self.device_settings.pad_params:
                     if key in pad_params.attrib:
                         params_outfile.attrib[key] = pad_params.attrib[key]
 
@@ -255,7 +319,7 @@ class MidiMapper:
                     )
 
                 params_outfile = params_outfile[0]
-                for key in self.settings.noteseq_params:
+                for key in self.device_settings.noteseq_params:
                     if key in noteseq_params.attrib:
                         params_outfile.attrib[key] = noteseq_params.attrib[key]
 
@@ -354,6 +418,9 @@ if __name__ == "__main__":
         print(f"Error: No .xml files found in the outfolder '{outfolder}'.")
         sys.exit(1)
 
+    mod_sources = [m for m in ModSources]
+    general_midi_settings = GeneralMidiSettings(mod_sources=mod_sources)
+
     # Set device-specific settings
     if tenten_device == "blackbox":
         settings = BlackboxSettings(
@@ -377,7 +444,8 @@ if __name__ == "__main__":
         infile=infile,
         outfiles=outfiles,
         tenten_device=device,
-        settings=settings,
+        device_settings=settings,
+        general_midi_settings=general_midi_settings,
         overwrite_files=overwrite,
     )
     mm.run()

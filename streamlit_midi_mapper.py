@@ -13,8 +13,11 @@ from models import (
     BlackboxSettings,
     BlackboxPadParam,
     BlackboxNoteseqParam,
-    BB_PAD_PARAM_DESCRIPTION,
+    DISPLAY_NAMES,
     BB_NOTESEQ_PARAM_DESCRIPTION,
+    GeneralMidiSettings,
+    ModSources,
+    DEFAULT_FALSE_CHECKBOX,
 )
 
 
@@ -46,9 +49,6 @@ if "device" not in st.session_state:
 if "file_extension" not in st.session_state:
     st.session_state["file_extension"] = None
 
-if "wipe_existing_mappings" not in st.session_state:
-    st.session_state["wipe_existing_mappings"] = False
-
 if "preset_uploaded" not in st.session_state:
     st.session_state["preset_uploaded"] = False
 
@@ -65,6 +65,11 @@ for key in BlackboxPadParam:
 
 # Blackbox Noteseq Params
 for key in BlackboxNoteseqParam:
+    if key not in st.session_state:
+        st.session_state[key] = False
+
+# General Midi Settings
+for key in ModSources:
     if key not in st.session_state:
         st.session_state[key] = False
 
@@ -274,11 +279,18 @@ if st.session_state["disable_outfile_upload"]:
     Select the settings you want to transfer.
     """
     )
-    st.checkbox(
-        "Wipe all existing CC mappings",
-        value=False,
-        disabled=st.session_state["zip_output"] is not None,
+    st.markdown(
+        """
+        ### General Midi Settings
+        """
     )
+    for key in ModSources:
+        checked = key not in DEFAULT_FALSE_CHECKBOX
+        st.session_state[key] = st.checkbox(
+            DISPLAY_NAMES.get(key, key),
+            value=checked,
+            disabled=st.session_state["zip_output"] is not None,
+        )
     if st.session_state["device"] == "blackbox":
         st.markdown(
             """
@@ -286,9 +298,10 @@ if st.session_state["disable_outfile_upload"]:
         """
         )
         for key in BlackboxPadParam:
+            checked = key not in DEFAULT_FALSE_CHECKBOX
             st.session_state[key] = st.checkbox(
-                BB_PAD_PARAM_DESCRIPTION.get(key),
-                value=True,
+                DISPLAY_NAMES.get(key, key),
+                value=checked,
                 disabled=st.session_state["zip_output"] is not None,
             )
 
@@ -305,7 +318,7 @@ if st.session_state["disable_outfile_upload"]:
             )
 
 
-def read_settings():
+def read_device_settings():
     if st.session_state["device"] == "blackbox":
         bb_settings = BlackboxSettings()
         bb_settings.pad_params = [
@@ -319,6 +332,14 @@ def read_settings():
     else:
         st.write("No settings available for this device.")
         return None
+
+
+def read_midi_settings():
+    general_midi_settings = GeneralMidiSettings()
+    general_midi_settings.mod_sources = [
+        key for key in ModSources if st.session_state[key]
+    ]
+    return general_midi_settings
 
 
 ######################################
@@ -335,11 +356,9 @@ if st.session_state["disable_outfile_upload"]:
     ):
         try:
             st.session_state["mm"].overwrite_files = True
-            st.session_state["mm"].wipe_existing_mappings = st.session_state[
-                "wipe_existing_mappings"
-            ]
             st.session_state["mm"].tenten_device = st.session_state["device"]
-            st.session_state["mm"].settings = read_settings()
+            st.session_state["mm"].device_settings = read_device_settings()
+            st.session_state["mm"].general_midi_settings = read_midi_settings()
             result_files = st.session_state["mm"].run()
             # TODO read zip file to memory and make downloadable
             st.session_state["zip_out_name"] = (
