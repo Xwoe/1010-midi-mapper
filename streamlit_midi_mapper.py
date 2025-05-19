@@ -1,8 +1,7 @@
 import os
 import streamlit as st
-from tempfile import NamedTemporaryFile, TemporaryDirectory, TemporaryFile
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from pathlib import Path
-from io import StringIO
 from tenten_zip_utils import zip_files_to_memory, unzip_files, zip_folder_to_memory
 
 from midi_mapper import MidiMapper
