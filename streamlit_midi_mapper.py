@@ -17,6 +17,8 @@ from models import (
     GeneralMidiSettings,
     ModSources,
     DEFAULT_FALSE_CHECKBOX,
+    TENTEN_XY,
+    MACRO_XY,
 )
 
 
@@ -284,6 +286,8 @@ if st.session_state["disable_outfile_upload"]:
         """
     )
     for key in ModSources:
+        if key in MACRO_XY and st.session_state["device"] not in TENTEN_XY:
+            continue
         checked = key not in DEFAULT_FALSE_CHECKBOX
         st.session_state[key] = st.checkbox(
             DISPLAY_NAMES.get(key, key),

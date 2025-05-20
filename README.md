@@ -28,15 +28,19 @@ To run the processing and put the processed files in a new (randomly named) fold
  ```
 
 ### `zip_presets.sh`: Create a Zip-File Only Containing `preset.xml` Files 
-This can be used if you want to use the web tool to convert blackbox projects. It will create a zip file, which only contains the `preset.xml` files, but with the local folder structure. This way you can zip it, upload it, convert it and then extract it over you old files to overwrite only the updated xml files.
+This can be used if you want to use the web tool to convert blackbox and bluebox projects. It will create a zip file, which only contains the `preset.xml` or `project.xml` files, but with the local folder structure. This way you can zip it, upload it, convert it and then extract it over you old files to overwrite only the updated xml files.
 
 Make it executable:
 ```bash
-chmod +x delete_unused_wavs.sh
+chmod +x zip_presets.sh
 ```
-Run it on a folder:
+**Blackbox**
 ```
 ./zip_presets.sh /path/to/folder/with/blackbox/projects/
+```
+**Bluebox**
+```
+./zip_presets.sh /path/to/folder/with/bluebox/projects/ project.xml
 ```
 
 
