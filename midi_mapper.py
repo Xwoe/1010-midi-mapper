@@ -22,6 +22,7 @@ from models import (
     TENTEN_ROW_COLUMN_LAYER,
     TENTEN_ROW_COLUMN_SYNTH,
     TENTEN_ROW_COLUMN,
+    TENTEN_ROW_LAYER,
 )
 
 ROOT_FOLDER = os.path.dirname(os.path.abspath(__file__))
@@ -204,6 +205,10 @@ class MidiMapper:
         elif self.tenten_device in TENTEN_ROW_COLUMN:
             cell_outfile = root_outfile.xpath(
                 f'.//cell[@row="{parent_attrib_infile["row"]}"][@column="{parent_attrib_infile["column"]}"]'
+            )
+        elif self.tenten_device in TENTEN_ROW_LAYER:
+            cell_outfile = root_outfile.xpath(
+                f'.//cell[@row="{parent_attrib_infile["row"]}"][@layer="{parent_attrib_infile["layer"]}"]'
             )
         return cell_outfile
 
