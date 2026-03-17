@@ -34,14 +34,12 @@ if "temp_folder" not in st.session_state:
     st.session_state["temp_folder"] = TemporaryDirectory(
         suffix="",
         prefix="tenten_folder_",
-        delete=False,
     )
 
 if "temp_zip_extraction_folder" not in st.session_state:
     st.session_state["temp_zip_extraction_folder"] = TemporaryDirectory(
         suffix="",
         prefix="tenten_zip_extraction_",
-        delete=False,
     )
 
 if "device" not in st.session_state:
@@ -177,7 +175,6 @@ if st.session_state["device"] is not None:
             suffix=suffix,
             prefix=st.session_state["uploaded_preset"].name,
             delete=False,
-            delete_on_close=False,
             dir=st.session_state["temp_folder"].name,
         ) as temp_file:
             temp_file.write(st.session_state["uploaded_preset"].getvalue())
@@ -224,7 +221,6 @@ if st.session_state["preset_uploaded"]:
                 suffix=".zip",
                 prefix=st.session_state["uploaded_outfiles"].name,
                 delete=False,
-                delete_on_close=False,
                 dir=st.session_state["temp_folder"].name,
             ) as temp_file:
                 temp_file.write(st.session_state["uploaded_outfiles"].getvalue())
@@ -260,7 +256,6 @@ if st.session_state["preset_uploaded"]:
                     suffix=suffix,
                     prefix=uploaded_file.name,
                     delete=False,
-                    delete_on_close=False,
                     dir=st.session_state["temp_folder"].name,
                 ) as temp_file:
                     temp_file.write(uploaded_file.getvalue())

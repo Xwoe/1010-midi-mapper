@@ -28,7 +28,7 @@ for subfolder in "$root_folder"/*/; do
   # Extract all referenced filenames from the preset.xml
   referenced_files=$(grep -o 'filename="\.\\[^"]\+"' "$preset_file" | sed 's/filename="\.\\//g' | sed 's/"//g')
 
-  # Iterate over all .wav files in the subfolder
+
   for wav_file in "$subfolder"*.wav; do
     # Skip if no .wav files are found
     if [ ! -f "$wav_file" ]; then
